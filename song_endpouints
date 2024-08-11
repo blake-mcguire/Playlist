@@ -1,0 +1,104 @@
+from flask import Flask, jsonify, request
+from models import Song, Playlist
+from algorithms import linear_search, merge_sort
+
+app = Flask(__name__)
+
+playlists = {}
+songs = {}
+
+
+@app.route('/songs', methods=['POST'])
+def create_song():
+    data = request.json
+    song = Song(data['name'], data['artist'], data['genre'])
+    songs[data['name']] = song
+    return jsonify({"message": "Song created successfully"}), 201
+
+@app.route('/songs/<name>', methods=['PUT'])
+def update_song(name):
+    if name not in songs:
+        return jsonify({"error": "Song not found"}), 404
+    data = request.json
+    song = songs[name]
+    song.name = data.get('name', song.name)
+    song.artist = data.get('artist', song.artist)
+    song.genre = data.get('genre', song.genre)
+    return jsonify({"message": "Song updated successfully"}), 200
+
+@app.route('/songs/<name>', methods=['DELETE'])
+def delete_song(name):
+    if name not in songs:
+        return jsonify({"error": "Song not found"}), 404
+    del songs[name]
+    return jsonify({"message": "Song deleted successfully"}), 200
+
+@app.route('/songs/search', methods=['GET'])
+def search_song():
+    query = request.args.get('query')
+    key = request.args.get('key', 'name')
+    results = linear_search(list(songs.values()), query, key)
+    return jsonify([song.__dict__ for song in results]), 200
+
+
+@app.route('/playlists', methods=['POST'])
+def create_playlist():
+    data = request.json
+    playlist = Playlist(data['name'])
+    playlists[data['name']] = playlist
+    return jsonify({"message": "Playlist created successfully"}), 201
+
+@app.route('/playlists/<name>', methods=['GET'])
+def get_playlist(name):
+    if name not in playlists:
+        return jsonify({"error": "Playlist not found"}), 404
+    playlist = playlists[name]
+    return jsonify({"name": playlist.name, "songs": [song.__dict__ for song in playlist.songs]}), 200
+
+@app.route('/playlists/<name>', methods=['PUT'])
+def update_playlist(name):
+    if name not in playlists:
+        return jsonify({"error": "Playlist not found"}), 404
+    data = request.json
+    playlist = playlists[name]
+    playlist.name = data.get('name', playlist.name)
+    return jsonify({"message": "Playlist updated successfully"}), 200
+
+@app.route('/playlists/<name>', methods=['DELETE'])
+def delete_playlist(name):
+    if name not in playlists:
+        return jsonify({"error": "Playlist not found"}), 404
+    del playlists[name]
+    return jsonify({"message": "Playlist deleted successfully"}), 200
+
+@app.route('/playlists/<name>/add_song', methods=['POST'])
+def add_song_to_playlist(name):
+    if name not in playlists:
+        return jsonify({"error": "Playlist not found"}), 404
+    data = request.json
+    song_name = data['song_name']
+    if song_name not in songs:
+        return jsonify({"error": "Song not found"}), 404
+    playlists[name].add_song(songs[song_name])
+    return jsonify({"message": "Song added to playlist"}), 200
+
+@app.route('/playlists/<name>/remove_song', methods=['POST'])
+def remove_song_from_playlist(name):
+    if name not in playlists:
+        return jsonify({"error": "Playlist not found"}), 404
+    data = request.json
+    song_name = data['song_name']
+    playlists[name].remove_song(song_name)
+    return jsonify({"message": "Song removed from playlist"}), 200
+
+@app.route('/playlists/<name>/sort', methods=['GET'])
+def sort_songs_in_playlist(name):
+    if name not in playlists:
+        return jsonify({"error": "Playlist not found"}), 404
+    key = request.args.get('key', 'name')
+    playlist = playlists[name]
+    playlist.songs = merge_sort(playlist.songs, key)
+    return jsonify({"message": f"Songs sorted by {key}"}), 200
+
+if __name__ == '__main__':
+    app.run(debug=True)
